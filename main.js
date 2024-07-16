@@ -3,22 +3,17 @@ const tasksLocal = JSON.parse(localStorage.getItem("tasksLocal")) || {
   listTask: [],
   taskQuantity: 0,
 };
-console.log("listTask", tasksLocal);
-
+const itemPerPage = 7;
+const defaultPage = 0;
 const taskContainerElm = document.getElementById("taskList");
 const addBtn = document.getElementById("addBtn");
 const inputTask = document.getElementById("inputTask");
+const paginationElement = document.querySelector(".pagination");
 
 // Function to create a task element
 const createTaskElement = (task) => {
   const taskElement = document.createElement("div");
-  const taskItemCls = [
-    "list-group-item",
-    "d-flex",
-    "justify-content-between",
-    "align-items-center",
-  ];
-  taskElement.classList.add(...taskItemCls);
+  taskElement.classList.add("list-group-item", "d-flex", "justify-content-between", "align-items-center");
 
   const taskDetailElem = document.createElement("span");
   taskDetailElem.classList.add("block");
@@ -31,19 +26,12 @@ const createTaskElement = (task) => {
   removeBtn.classList.add("btn", "btn-danger");
   removeBtn.setAttribute("type", "button");
   removeBtn.innerText = "Xóa";
-  removeBtn.addEventListener("click", (ev) => {
-    console.log(task.taskId);
-    const indexRemoveItem = tasksLocal.listTask.findIndex(
-      (val) => val.taskId === task.taskId
-    );
-
+  removeBtn.addEventListener("click", () => {
+    const indexRemoveItem = tasksLocal.listTask.findIndex(val => val.taskId === task.taskId);
     if (indexRemoveItem !== -1) {
       tasksLocal.listTask.splice(indexRemoveItem, 1);
       tasksLocal.taskQuantity = tasksLocal.listTask.length;
-      console.log(tasksLocal.listTask);
-      // Save to localStorage
       localStorage.setItem("tasksLocal", JSON.stringify(tasksLocal));
-      // Re-render tasks
       renderTasks();
     } else {
       console.log(`Task with ID ${task.taskId} not found.`);
@@ -63,104 +51,99 @@ const createTaskElement = (task) => {
 
   const saveBtn = document.createElement("button");
   saveBtn.classList.add("btn", "btn-primary", "d-none");
-  saveBtn.setAttribute("type", "text");
+  saveBtn.setAttribute("type", "button");
   saveBtn.innerText = "Save";
 
-  const cancelBTN = document.createElement("button");
-  cancelBTN.classList.add("btn", "btn-secondary", "d-none");
-  cancelBTN.setAttribute("type", "text");
-  cancelBTN.innerText = "Cancel";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.classList.add("btn", "btn-secondary", "d-none");
+  cancelBtn.setAttribute("type", "button");
+  cancelBtn.innerText = "Cancel";
 
   editBtn.addEventListener("click", () => {
-    editBtn.classList.add("d-none");
-    removeBtn.classList.add("d-none");
-    taskDetailElem.classList.add("d-none");
-    saveBtn.classList.remove("d-none");
-    cancelBTN.classList.remove("d-none");
-    inputEdit.classList.remove("d-none");
+    toggleEditMode(true, { editBtn, removeBtn, taskDetailElem, inputEdit, saveBtn, cancelBtn });
   });
-  cancelBTN.addEventListener("click", () => {
-    editBtn.classList.remove("d-none");
-    removeBtn.classList.remove("d-none");
-    taskDetailElem.classList.remove("d-none");
-    saveBtn.classList.add("d-none");
-    cancelBTN.classList.add("d-none");
-    inputEdit.classList.add("d-none");
+  cancelBtn.addEventListener("click", () => {
+    toggleEditMode(false, { editBtn, removeBtn, taskDetailElem, inputEdit, saveBtn, cancelBtn });
   });
   saveBtn.addEventListener("click", () => {
     const taskDetail = inputEdit.value.trim();
-
-    if (taskDetail === "") {
-      console.log("Task detail is empty. Task not added.");
-      return;
-    }
-
-    const indexChangeItem = tasksLocal.listTask.findIndex(
-      (val) => val.taskId === task.taskId
-    );
-
-    if (indexChangeItem !== -1) {
-      tasksLocal.listTask[indexChangeItem].taskDetail = taskDetail;
-      // Save to localStorage
-      localStorage.setItem("tasksLocal", JSON.stringify(tasksLocal));
-      // Re-render tasks
-      renderTasks();
+    if (taskDetail) {
+      const indexChangeItem = tasksLocal.listTask.findIndex(val => val.taskId === task.taskId);
+      if (indexChangeItem !== -1) {
+        tasksLocal.listTask[indexChangeItem].taskDetail = taskDetail;
+        localStorage.setItem("tasksLocal", JSON.stringify(tasksLocal));
+        renderTasks();
+      } else {
+        console.log(`Task with ID ${task.taskId} not found.`);
+      }
     } else {
-      console.log(`Task with ID ${task.taskId} not found.`);
+      console.log("Task detail is empty. Task not added.");
     }
-
-    inputTask.value = "";
+    toggleEditMode(false, { editBtn, removeBtn, taskDetailElem, inputEdit, saveBtn, cancelBtn });
   });
 
-  groupBtn.append(editBtn, removeBtn, saveBtn, cancelBTN);
+  groupBtn.append(editBtn, removeBtn, saveBtn, cancelBtn);
   taskElement.append(taskDetailElem, inputEdit, groupBtn);
-
   return taskElement;
 };
 
-// Function to render tasks
-const renderTasks = () => {
-  // Clear current tasks
-  taskContainerElm.innerHTML = "";
+const toggleEditMode = (isEditMode, elements) => {
+  const { editBtn, removeBtn, taskDetailElem, inputEdit, saveBtn, cancelBtn } = elements;
+  editBtn.classList.toggle("d-none", isEditMode);
+  removeBtn.classList.toggle("d-none", isEditMode);
+  taskDetailElem.classList.toggle("d-none", isEditMode);
+  inputEdit.classList.toggle("d-none", !isEditMode);
+  saveBtn.classList.toggle("d-none", !isEditMode);
+  cancelBtn.classList.toggle("d-none", !isEditMode);
+};
 
-  // Re-render tasks from tasksLocal
-  tasksLocal.listTask.forEach((task) => {
+const getTotalPage = (quantity) => Math.ceil(quantity / itemPerPage);
+
+// Function to render tasks
+const renderTasks = (page = defaultPage) => {
+  taskContainerElm.innerHTML = "";
+  const fromItem = page * itemPerPage;
+  const toItem = page * itemPerPage + itemPerPage;
+  tasksLocal.listTask.slice(fromItem, toItem).forEach(task => {
     const taskElement = createTaskElement(task);
     taskContainerElm.append(taskElement);
   });
+  renderPagination();
+};
+
+const renderPagination = () => {
+  paginationElement.innerHTML = "";
+  const totalPage = getTotalPage(tasksLocal.taskQuantity);
+  for (let i = 0; i < totalPage; i++) {
+    const pageItem = document.createElement("li");
+    pageItem.classList.add("page-item");
+    const pageLink = document.createElement("button");
+    pageLink.classList.add("page-link");
+    pageLink.innerText = i + 1;
+    pageItem.append(pageLink);
+    pageItem.addEventListener("click", () => renderTasks(i));
+    paginationElement.append(pageItem);
+  }
 };
 
 // Load tasks on page load
-window.onload = (event) => {
-  console.log("page is fully loaded");
+window.onload = () => {
   renderTasks();
 };
 
 // Function to add a new task
 const addTask = () => {
   const taskDetail = inputTask.value.trim();
-
-  if (taskDetail !== "") {
+  if (taskDetail) {
     const newTask = {
       taskId: tasksLocal.listTask.length + 1,
       taskDetail: taskDetail,
     };
-
-    // Add new task to the list
     tasksLocal.listTask.push(newTask);
-
-    // Update task quantity
     tasksLocal.taskQuantity = tasksLocal.listTask.length;
-
-    // Save to localStorage
     localStorage.setItem("tasksLocal", JSON.stringify(tasksLocal));
-
-    // Clear input field
     inputTask.value = "";
-
-    // Re-render tasks
     renderTasks();
-    console.log(tasksLocal, "after");
   } else {
     console.log("Task detail is empty. Task not added.");
   }
